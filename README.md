@@ -1,4 +1,4 @@
-# Wormy-Scripts-for-Serotonin-deficient-Teenagers
+# Wormy_Scripts_for_Serotonin-deficient_Teenagers
 
 **Worm tracking tools in Python for behavioral neuroscience**
 
@@ -6,7 +6,7 @@
 
 ## Overview
 
-This repository contains Python scripts designed to analyze poorly-recorded videos of _Caenorhabditis elegans_ (C. elegans) locomotion. The primary goal is to facilitate the study of the neurological bases of behavior, especially foraging, by providing tools to track and analyze worm movement. These scripts are intended for researchers interested in behavioral neuroscience, neurogenetics, and animal tracking.
+This repository contains Python scripts designed to analyze poorly-recorded videos of _Caenorhabditis elegans_ (_C. elegans_) locomotion. The primary goal is to facilitate the study of the neurological bases of behavior, especially foraging, by providing tools to track and analyze worm movement. These scripts are intended for researchers interested in behavioral neuroscience, neurogenetics, and animal tracking.
 
 ## Features
 
