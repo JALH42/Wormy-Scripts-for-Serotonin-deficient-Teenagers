@@ -1,0 +1,69 @@
+# Wormy-Scripts-for-Serotonin-defficient-Teenagers
+
+**Worm tracking tools in Python for behavioral neuroscience**
+
+[GitHub Repository](https://github.com/JALH42/Wormy-Scripts-for-Serotonin-defficient-Teenagers)
+
+## Overview
+
+This repository contains Python scripts designed to analyze poorly-recorded videos of _Caenorhabditis elegans_ (C. elegans) locomotion. The primary goal is to facilitate the study of the neurological bases of behavior, especially foraging, by providing tools to track and analyze worm movement. These scripts are intended for researchers interested in behavioral neuroscience, neurogenetics, and animal tracking.
+
+## Features
+
+- Pure Python and NumPy-based worm matching algorithms
+- Suitable for compilation with JIT tools like Pyccel or Numba for enhanced performance
+- Handles noisy or low-quality video data
+- Easily extensible for additional behavioral metrics
+
+## Example Functionality
+
+```python
+def match_worms_py(features, prev_positions, squared_dist_limit):
+    """
+    features: (M,2) float array of candidate centroids (x,y)
+    prev_positions: (W,2) float array of previous worm positions
+    squared_dist_limit: float
+    Returns matched_positions: (W,2) float array
+    Pure Python loops - intended for compilation.
+    """
+    # Function details...
+```
+
+## Requirements
+
+- Python 3.x
+- NumPy
+
+## Installation
+
+Clone the repository:
+```bash
+git clone https://github.com/JALH42/Wormy-Scripts-for-Serotonin-defficient-Teenagers.git
+cd Wormy-Scripts-for-Serotonin-defficient-Teenagers
+```
+Install dependencies:
+```bash
+pip install numpy
+```
+
+## Usage
+
+Import and use the provided functions in your project:
+```python
+from El_Traquero import match_worms_py, match_worms_numpy
+
+# Example usage
+positions = match_worms_py(features, prev_positions, squared_dist_limit)
+```
+
+## Contributing
+
+Feel free to fork this repository and submit pull requests. Issues and suggestions are welcome!
+
+## License
+
+This repository currently does not specify a license. Please contact the repository owner for more information.
+
+## Contact
+
+Repository owner: [JALH42](https://github.com/JALH42)
