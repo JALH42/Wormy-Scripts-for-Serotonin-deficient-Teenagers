@@ -15,19 +15,6 @@ This repository contains Python scripts designed to analyze poorly-recorded vide
 - Handles noisy or low-quality video data
 - Easily extensible for additional behavioral metrics
 
-## Example Functionality
-
-```python
-def match_worms_py(features, prev_positions, squared_dist_limit):
-    """
-    features: (M,2) float array of candidate centroids (x,y)
-    prev_positions: (W,2) float array of previous worm positions
-    squared_dist_limit: float
-    Returns matched_positions: (W,2) float array
-    Pure Python loops - intended for compilation.
-    """
-    # Function details...
-```
 
 ## Requirements
 
