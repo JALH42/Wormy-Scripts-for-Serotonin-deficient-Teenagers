@@ -54,14 +54,51 @@ except Exception:
 # USER CONFIGURATION SECTION - CUSTOMIZE THESE PARAMETERS FOR YOUR EXPERIMENT
 # =============================================================================
 
-# INPUT/OUTPUT PATHS (Update these for your system)
-VIDEO_PATH = "/Users/jorgelunaherrera/Documents/Jorge - Tracking sample/output_video2.avi"          # Path to your input AVI video file
-FRAMES_DIR = "/Users/jorgelunaherrera/Documents/Jorge - Tracking sample/extracted_frames5"         # Directory where frames will be extracted
-OUTPUT_DIR = "/Users/jorgelunaherrera/Documents/Jorge - Tracking sample/extracted_frames5/results" # Directory for output files and results
+# =============================================================================
+# USER CONFIGURATION SECTION - AUTOMATIC INPUT/OUTPUT SELECTION (macOS GUI)
+# =============================================================================
+
+import tkinter as tk
+from tkinter import filedialog
+
+# Create hidden root window for file dialog
+root = tk.Tk()
+root.withdraw()
+
+print("📂 Please select your .avi video file")
+video_file = filedialog.askopenfilename(
+    title="Select AVI Video File",
+    filetypes=[("AVI Video Files", "*.avi")]
+)
+
+if not video_file:
+    print("❌ No file selected. Exiting.")
+    sys.exit(0)
+
+# Normalize and extract base info
+VIDEO_PATH = os.path.abspath(video_file)
+video_dir = os.path.dirname(VIDEO_PATH)
+video_name = os.path.splitext(os.path.basename(VIDEO_PATH))[0]
+
+# Create derived output directories
+FRAMES_DIR = os.path.join(video_dir, f"{video_name}_frames")
+OUTPUT_DIR = os.path.join(FRAMES_DIR, "results")
+
+# Ensure directories exist
+os.makedirs(FRAMES_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+print(f"✅ Video selected: {VIDEO_PATH}")
+print(f"📁 Frames directory: {FRAMES_DIR}")
+print(f"📁 Output directory: {OUTPUT_DIR}")
+
+# =============================================================================
+# TRACKING PARAMETERS (Adjust these based on your video characteristics)
+# =============================================================================
 
 # TRACKING PARAMETERS (Adjust these based on your video characteristics)
-MIN_BLOB_SIZE = 25                        # Minimum particle size to consider as worm (pixels)
-MAX_DISTANCE_LIMIT = 50                   # Maximum distance for worm matching between frames (pixels)
+MIN_BLOB_SIZE = 20                        # Minimum particle size to consider as worm (pixels)
+MAX_DISTANCE_LIMIT = 20                   # Maximum distance for worm matching between frames (pixels)
 EXTRACT_ALL_FRAMES = True                 # Set to False to extract only first N frames for testing
 MAX_FRAMES_TO_EXTRACT = 1000              # Only used if EXTRACT_ALL_FRAMES is False
 
