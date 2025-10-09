@@ -46,16 +46,6 @@ Install dependencies:
 pip install numpy
 ```
 
-## Usage
-
-Import and use the provided functions in your project:
-```python
-from El_Traquero import match_worms_py, match_worms_numpy
-
-# Example usage
-positions = match_worms_py(features, prev_positions, squared_dist_limit)
-```
-
 ## Contributing
 
 Feel free to fork this repository and submit pull requests. Issues and suggestions are welcome!
