@@ -1,43 +1,55 @@
-# BATCH BACKGROUND REMOVAL + THRESHOLDING (B&W OUTPUT)
+# BATCH BACKGROUND REMOVAL + THRESHOLDING (B&W OUTPUT, OPTIMIZED)
+# Best codec for .avi: IYUV or MJPG
+	
+# BATCH BACKGROUND REMOVAL + THRESHOLDING (B&W OUTPUT, OPTIMIZED)
 # Removes background and TH multiple avi files in a folder
 # Folder needs to be specified within script TO BE MODIFIED
-# Best codec for .avi: IYUV or MJPG
 
 import cv2
 import numpy as np
 import os
 from glob import glob
 
-def remove_background_from_video(video_path, output_path, apply_gaussian=True, ksize=(5, 5), threshold_value=3):
+def compute_background(video_path):
+    """Compute the average background using cv2.accumulate (fast C++)."""
     cap = cv2.VideoCapture(video_path)
+    ret, frame = cap.read()
+    if not ret:
+        cap.release()
+        return None
 
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps    = cap.get(cv2.CAP_PROP_FPS)
-
-    # --- First pass: compute average background ---
-    avg_frame = np.zeros((height, width, 3), dtype=np.float64)
+    height, width = frame.shape[:2]
+    avg_frame = np.zeros((height, width, 3), dtype=np.float32)
     count = 0
-
-    print(f"Computing background for: {os.path.basename(video_path)}")
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
-        avg_frame += frame.astype(np.float64)
+        cv2.accumulate(frame, avg_frame)
         count += 1
 
     cap.release()
 
     if count > 0:
         avg_frame /= count
-    avg_frame = avg_frame.astype(np.uint8)
 
-    # --- Second pass: subtract background, threshold, and save video ---
+    return avg_frame.astype(np.uint8)
+
+
+def remove_background_from_video(video_path, output_path, apply_gaussian=True, ksize=(5, 5), threshold_value=3):
+    print(f"Computing background for: {os.path.basename(video_path)}")
+    avg_frame = compute_background(video_path)
+    if avg_frame is None:
+        print(f"Skipping {video_path} (could not read frames).")
+        return
+
     cap = cv2.VideoCapture(video_path)
-    fourcc = cv2.VideoWriter_fourcc(*'MJPG')  # good general-purpose codec
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height), isColor=False)
 
     print(f"Processing and saving thresholded output: {os.path.basename(output_path)}")
@@ -47,19 +59,14 @@ def remove_background_from_video(video_path, output_path, apply_gaussian=True, k
         if not ret:
             break
 
-        # Subtract background
         fg = cv2.absdiff(frame, avg_frame)
 
         if apply_gaussian:
             fg = cv2.GaussianBlur(fg, ksize, 0)
 
-        # Convert to grayscale
         gray = cv2.cvtColor(fg, cv2.COLOR_BGR2GRAY)
-
-        # Apply threshold to get black & white result
         _, thresh = cv2.threshold(gray, threshold_value, 255, cv2.THRESH_BINARY)
 
-        # Write to output
         out.write(thresh)
 
     cap.release()
