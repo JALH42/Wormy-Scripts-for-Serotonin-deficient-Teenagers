@@ -1,14 +1,20 @@
 # BATCH BACKGROUND REMOVAL + THRESHOLDING (B&W OUTPUT, OPTIMIZED)
 # Best codec for .avi: IYUV or MJPG
-	
-# BATCH BACKGROUND REMOVAL + THRESHOLDING (B&W OUTPUT, OPTIMIZED)
-# Removes background and TH multiple avi files in a folder
-# Folder needs to be specified within script TO BE MODIFIED
+
+# Removes background and thresholds multiple .avi files in a selected folder.
+# At runtime, a window will prompt you to choose the input folder.
+# The output will be written to a 'processed' subfolder inside the chosen input folder.
 
 import cv2
 import numpy as np
 import os
+import sys
 from glob import glob
+
+# GUI for selecting input directory
+import tkinter as tk
+from tkinter import filedialog, messagebox
+
 
 def compute_background(video_path):
     """Compute the average background using cv2.accumulate (fast C++)."""
@@ -78,14 +84,39 @@ def process_folder(input_folder, output_folder, apply_gaussian=True, threshold_v
     os.makedirs(output_folder, exist_ok=True)
     video_files = glob(os.path.join(input_folder, "*.avi"))
 
+    if not video_files:
+        print(f"No .avi files found in: {input_folder}")
+        return
+
     for video_file in video_files:
         filename = os.path.basename(video_file)
         output_file = os.path.join(output_folder, f"processed_{filename}")
         remove_background_from_video(video_file, output_file, apply_gaussian, threshold_value=threshold_value)
 
 
-if __name__ == "__main__":
-    input_folder = "/Users/jorgelunaherrera/Documents/BHV 22SEP2025/"
-    output_folder = "/Users/jorgelunaherrera/Documents/BHV 22SEP2025/processed/"
+def select_input_folder_dialog():
+    """Open a folder selection dialog and return the chosen path, or '' if cancelled."""
+    root = tk.Tk()
+    root.withdraw()
+    # Bring the dialog to the front on some platforms
+    root.update()
+    root.attributes("-topmost", True)
+    selected = filedialog.askdirectory(title="Select input folder containing .avi videos")
+    root.attributes("-topmost", False)
+    root.destroy()
+    return selected
 
+
+if __name__ == "__main__":
+    input_folder = select_input_folder_dialog()
+    if not input_folder:
+        print("No folder selected. Exiting.")
+        sys.exit(0)
+
+    output_folder = os.path.join(input_folder, "processed")
+
+    print(f"Input folder: {input_folder}")
+    print(f"Output folder: {output_folder}")
+
+    # Adjust threshold_value if needed
     process_folder(input_folder, output_folder, apply_gaussian=True, threshold_value=5)
