@@ -1,4 +1,4 @@
-# Wormy_Scripts_for_Serotonin-deficient_Teenagers
+# Wormy Scripts for Serotonin-deficient Teenagers
 
 **Worm tracking tools in Python for behavioral neuroscience**
 
