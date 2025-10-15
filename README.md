@@ -15,22 +15,12 @@ This repository contains Python scripts designed to analyze poorly-recorded vide
 - Handles noisy or low-quality video data
 - Easily extensible for additional behavioral metrics
 
-
-## Requirements
-
-- Python 3.x
-- NumPy
-
 ## Installation
 
 Clone the repository:
 ```bash
 git clone https://github.com/JALH42/Wormy-Scripts-for-Serotonin-defficient-Teenagers.git
 cd Wormy-Scripts-for-Serotonin-defficient-Teenagers
-```
-Install dependencies:
-```bash
-pip install numpy
 ```
 
 ## Contributing
