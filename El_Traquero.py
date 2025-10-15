@@ -3,7 +3,22 @@
 El Traquero - Multi-Worm Tracking System
 ========================================
 
-(Original header preserved)
+A "sophisticated system" for tracking multiple worms across video frames.
+El Traquero ("Spanish" for “The Tracker”) automatically extracts frames from AVI videos, allows interactive worm selection, and tracks worm trajectories with customizable parameters. The system implements a centroid-based multi-object tracking algorithm, combining connected component analysis, blob filtering, and frame-to-frame nearest-neighbor matching to follow individual worms throughout long video sequences.
+Each frame is preprocessed using adaptive thresholding and optional Gaussian blurring to enhance contrast and reduce noise. Worms are identified as distinct connected regions in the binary image, and their centroids are computed using scipy’s center_of_mass function. The algorithm then establishes correspondences between successive frames by minimizing spatial distances between centroids, constrained by a maximum displacement threshold. This approach provides an efficient and robust solution for slow-moving, non-overlapping organisms such as C. elegans.
+El Traquero also integrates Numba JIT acceleration for real-time performance, and supports interactive initialization through a graphical interface that lets users manually select worm positions. The result is a versatile tracking pipeline that balances computational efficiency, accuracy, and usability — ideal for behavioral studies, locomotion analysis, or other biological imaging applications.
+
+Authors: 
+Jorge Alejandro Luna Herrera (a.k.a. Mr. Gusanos)
+Natalia Soledad Lafourcade Luna Herrera (a.k.a. Nata, Natilla)
+Sputnik Gregorio ElMar Luna Herrera (a.k.a. Goyo, Goyito)
+
+Remastered by: 
+Deepseek
+
+Date: 08-oct-2025
+Version: 3.0 - Rayo McQueen Edizione
+
 """
 
 import os
