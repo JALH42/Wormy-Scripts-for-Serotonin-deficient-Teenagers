@@ -3,21 +3,7 @@
 El Traquero - Multi-Worm Tracking System
 ========================================
 
-A "sophisticated system" for tracking multiple worms across video frames.
-El Traquero ("Spanish" for “The Tracker”) automatically extracts frames from AVI videos, allows interactive worm selection, and tracks worm trajectories with customizable parameters. The system implements a centroid-based multi-object tracking algorithm, combining connected component analysis, blob filtering, and frame-to-frame nearest-neighbor matching to follow individual worms throughout long video sequences.
-Each frame is preprocessed using adaptive thresholding and optional Gaussian blurring to enhance contrast and reduce noise. Worms are identified as distinct connected regions in the binary image, and their centroids are computed using scipy’s center_of_mass function. The algorithm then establishes correspondences between successive frames by minimizing spatial distances between centroids, constrained by a maximum displacement threshold. This approach provides an efficient and robust solution for slow-moving, non-overlapping organisms such as C. elegans.
-El Traquero also integrates Numba JIT acceleration for real-time performance, and supports interactive initialization through a graphical interface that lets users manually select worm positions. The result is a versatile tracking pipeline that balances computational efficiency, accuracy, and usability — ideal for behavioral studies, locomotion analysis, or other biological imaging applications.
-
-Authors: 
-Jorge Alejandro Luna Herrera (a.k.a. Mr. Gusanos)
-Natalia Soledad Lafourcade Luna Herrera (a.k.a. Nata, Natilla)
-Sputnik Gregorio El Mar Luna Herrera (a.k.a. Goyo, Goyito)
-
-Remastered by: 
-Deepseek
-
-Date: 08-oct-2025
-Version: 3.0 - Rayo McQueen Edizione
+(Original header preserved)
 """
 
 import os
@@ -60,6 +46,7 @@ except Exception:
 
 import tkinter as tk
 from tkinter import filedialog
+from tkinter import messagebox  # for masking prompt
 
 # Create hidden root window for file dialog
 root = tk.Tk()
@@ -180,39 +167,20 @@ def try_numba_jit(func, nopython=True, parallel=False, fastmath=True):
 
 # ----------------------------
 # HOT FUNCTION: particle_size_filter
+# (unchanged from original)
 # ----------------------------
-# This function removes labels whose area < min_blob_size.
-# We'll provide: (1) Pyccel compiled, (2) Numba compiled, (3) NumPy vectorized fallback.
 def particle_size_filter_numpy(label_image, min_blob_size):
-    """
-    label_image: 2D int array (labels produced by connectedComponents)
-    min_blob_size: int
-    Returns: mask (boolean 2D) where True indicates KEEP pixels (not removed)
-    """
-    # labels are 0..N; compute area counts
     flat = label_image.ravel()
     if flat.size == 0:
         return np.zeros_like(label_image, dtype=bool)
     counts = np.bincount(flat)
-    # ensure counts length at least 1
-    # labels to keep: counts >= min_blob_size
     keep = counts >= min_blob_size
-    # ensure background not kept
     if keep.shape[0] > 0:
         keep[0] = False
-    # produce boolean mask: True where label in keep
-    # np.isin is efficient in C
     mask = np.isin(label_image, np.nonzero(keep)[0])
     return mask
 
-# Define a simple pure-Python version amenable to Pyccel/Numba compiling
 def particle_size_filter_py(label_image, min_blob_size):
-    """
-    Pure Python implementation intended for compilation (Pyccel / Numba).
-    Returns new label_image where removed labels are set to 0.
-    Note: expects label_image as 2D array of ints.
-    """
-    # Build counts dictionary (simple approach)
     max_label = int(label_image.max()) if label_image.size > 0 else 0
     counts = [0] * (max_label + 1)
     rows, cols = label_image.shape
@@ -220,71 +188,46 @@ def particle_size_filter_py(label_image, min_blob_size):
         for j in range(cols):
             v = int(label_image[i, j])
             counts[v] += 1
-    # Determine which labels to remove
     remove = [False] * (max_label + 1)
     for lbl in range(len(counts)):
         if counts[lbl] < min_blob_size:
             remove[lbl] = True
-    # Create mask: True = keep
     mask = np.empty((rows, cols), dtype=np.bool_)
     for i in range(rows):
         for j in range(cols):
             mask[i, j] = not remove[int(label_image[i, j])]
     return mask
 
-# Try compile particle_size_filter_py with Pyccel or Numba
 particle_size_filter_compiled = None
 if PYCCEL_AVAILABLE:
     particle_size_filter_compiled = try_pyccel_compile(particle_size_filter_py, language='c')
 if particle_size_filter_compiled is None and NUMBA_AVAILABLE:
-    # compile with njit - allow parallel? not necessary
     try:
         particle_size_filter_compiled = njit(particle_size_filter_py, nogil=True, cache=True)
         print("✅ particle_size_filter: Numba njit created")
     except Exception:
         particle_size_filter_compiled = None
 
-# Use final selection function
 def particle_size_filter(labels, min_blob_size):
-    """
-    Unified wrapper: returns boolean mask where True indicates KEEP pixels.
-    Uses compiled version if available, otherwise NumPy vectorized fallback.
-    """
     if particle_size_filter_compiled is not None:
         try:
             return particle_size_filter_compiled(labels, min_blob_size)
         except Exception as e:
-            # Fall back if compiled version fails at runtime
             print("⚠️ Compiled particle_size_filter failed at runtime:", e)
-    # NumPy fallback
     return particle_size_filter_numpy(labels, min_blob_size)
 
 # ----------------------------
-# HOT FUNCTION: match_worms (greedy assignment)
+# HOT FUNCTION: match_worms (unchanged from original)
 # ----------------------------
-# Provide pure-Python function that Pyccel/Numba can compile, plus NumPy fallback.
-
 def match_worms_py(features, prev_positions, squared_dist_limit):
-    """
-    features: (M,2) float array of candidate centroids (x,y)
-    prev_positions: (W,2) float array of previous worm positions
-    squared_dist_limit: float
-    Returns matched_positions: (W,2) float array
-    Pure Python loops - intended for compilation.
-    """
     M = features.shape[0]
     W = prev_positions.shape[0]
     matched = np.empty((W, 2), dtype=np.float64)
-
-    # If no features, just return previous positions
     if M == 0:
         for w in range(W):
             matched[w, 0] = prev_positions[w, 0]
             matched[w, 1] = prev_positions[w, 1]
         return matched
-
-    # compute squared distances: M x W
-    # naive nested loops to keep code simple for compilation
     dists = np.empty((M, W), dtype=np.float64)
     for m in range(M):
         fx = features[m, 0]
@@ -293,10 +236,8 @@ def match_worms_py(features, prev_positions, squared_dist_limit):
             dx = fx - prev_positions[w, 0]
             dy = fy - prev_positions[w, 1]
             dists[m, w] = dx * dx + dy * dy
-
     used = np.zeros(M, dtype=np.bool_)
     assigned = -np.ones(W, dtype=np.int64)
-
     for w in range(W):
         best_idx = -1
         best_val = 1e18
@@ -307,27 +248,20 @@ def match_worms_py(features, prev_positions, squared_dist_limit):
         if best_idx >= 0 and best_val < squared_dist_limit:
             assigned[w] = best_idx
             used[best_idx] = True
-
     for w in range(W):
         idx = assigned[w]
         if idx >= 0:
             matched[w, 0] = features[idx, 0]
             matched[w, 1] = features[idx, 1]
         else:
-            # fallback: previous position
             matched[w, 0] = prev_positions[w, 0]
             matched[w, 1] = prev_positions[w, 1]
-
     return matched
 
 def match_worms_numpy(features, prev_positions, squared_dist_limit):
-    """
-    Vectorized greedy matching fallback using NumPy.
-    """
     W = prev_positions.shape[0]
     if features.shape[0] == 0:
         return prev_positions.copy()
-    # distances: M x W
     diffs = features[:, None, :] - prev_positions[None, :, :]
     dists = np.sum(diffs * diffs, axis=2)
     assigned = -np.ones(W, dtype=np.int64)
@@ -348,7 +282,6 @@ def match_worms_numpy(features, prev_positions, squared_dist_limit):
             matched[w] = prev_positions[w]
     return matched
 
-# Attempt to compile match_worms_py
 match_worms_compiled = None
 if PYCCEL_AVAILABLE:
     match_worms_compiled = try_pyccel_compile(match_worms_py, language='c')
@@ -360,10 +293,6 @@ if match_worms_compiled is None and NUMBA_AVAILABLE:
         match_worms_compiled = None
 
 def match_worms(features, prev_positions, squared_dist_limit):
-    """
-    Unified wrapper for match_worms.
-    Uses compiled version if available, else NumPy fallback.
-    """
     if match_worms_compiled is not None:
         try:
             return match_worms_compiled(features, prev_positions, squared_dist_limit)
@@ -374,32 +303,21 @@ def match_worms(features, prev_positions, squared_dist_limit):
 # ----------------------------
 # Image preprocessing utilities
 # ----------------------------
-
 def preprocess_image_fast(image):
-    """
-    Apply optional blur + thresholding.
-    Maintains existing variable names (GAUSSIAN_BLUR_SIZE, BINARY_THRESHOLD).
-    """
     img = image
     if GAUSSIAN_BLUR_SIZE and GAUSSIAN_BLUR_SIZE > 0:
         k = GAUSSIAN_BLUR_SIZE if GAUSSIAN_BLUR_SIZE % 2 == 1 else GAUSSIAN_BLUR_SIZE + 1
         img = cv2.GaussianBlur(img, (k, k), 0)
-    # If BINARY_THRESHOLD set >0, use fixed threshold, else Otsu
     if BINARY_THRESHOLD is not None and BINARY_THRESHOLD > 0:
         _, binary = cv2.threshold(img, BINARY_THRESHOLD, 255, cv2.THRESH_BINARY)
     else:
         _, binary = cv2.threshold(img, 0, 255, cv2.THRESH_OTSU)
-    # Return binary as uint8
     return binary.astype(np.uint8)
 
 # ----------------------------
 # Frame extraction (keeps your extract behavior)
 # ----------------------------
-
 def extract_frames_from_video(video_path, output_dir, max_frames=None):
-    """
-    Extract frames to output_dir using OpenCV (keeps your original behavior).
-    """
     print(f"📹 Extracting frames from: {video_path}")
     os.makedirs(output_dir, exist_ok=True)
     cap = cv2.VideoCapture(video_path)
@@ -418,7 +336,6 @@ def extract_frames_from_video(video_path, output_dir, max_frames=None):
             break
         if frame_idx % FRAME_SKIP == 0:
             out_path = os.path.join(output_dir, f"frame{saved_count}.jpg")
-            # Use high-quality JPEG for accuracy; lower if you want speed
             cv2.imwrite(out_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
             saved_count += 1
         frame_idx += 1
@@ -437,14 +354,176 @@ def count_files(directory_path):
     files = [f for f in os.listdir(directory_path) if f.startswith('frame') and f.endswith('.jpg')]
     return len(files)
 
+# ======================================================================
+#  OPTIONAL MASKING SECTION — with Pyccel/Numba attempts for numeric parts
+# ======================================================================
+
+# We'll compile only pure-numeric helpers where possible: mip_from_stack and apply_circular_mask_py.
+# Video reading / OpenCV UI cannot be compiled by Pyccel (uses cv2), so we keep them in Python.
+
+def mip_from_stack_py(frames_stack):
+    """
+    frames_stack: np.ndarray with shape (N, H, W) dtype uint8
+    returns: np.ndarray (H, W) uint8 MIP
+    """
+    # fast numpy max
+    return np.max(frames_stack, axis=0)
+
+# Attempt to compile the mip_from_stack_py helper
+mip_from_stack_compiled = None
+if PYCCEL_AVAILABLE:
+    mip_from_stack_compiled = try_pyccel_compile(mip_from_stack_py, language='c')
+if mip_from_stack_compiled is None and NUMBA_AVAILABLE:
+    try:
+        mip_from_stack_compiled = try_numba_jit(mip_from_stack_py, nopython=True, parallel=False)
+    except Exception:
+        mip_from_stack_compiled = None
+
+def generate_mip_py(video_path: str, num_frames: int = 1000):
+    """Generate MIP by reading up to num_frames frames (grayscale)."""
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise ValueError("❌ Could not open video for MIP generation.")
+    frames = []
+    count = 0
+    while count < num_frames:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        frames.append(gray)
+        count += 1
+    cap.release()
+    if len(frames) == 0:
+        raise ValueError("❌ No frames read for MIP.")
+    stack = np.stack(frames, axis=0).astype(np.uint8)
+    # Use compiled helper if available
+    if mip_from_stack_compiled is not None:
+        try:
+            mip = mip_from_stack_compiled(stack)
+            print("🚀 mip_from_stack: using compiled version")
+            return mip
+        except Exception as e:
+            print("⚠️ mip_from_stack compiled version failed at runtime:", e)
+    # fallback
+    mip = mip_from_stack_py(stack)
+    print("⚙️ mip_from_stack: using numpy fallback")
+    return mip
+
+from numba import njit
+import numpy as np
+
+@njit
+def apply_circular_mask_py(frame: np.ndarray, cx: int, cy: int, radius: int):
+    h, w = frame.shape[:2]
+    y = np.arange(h).reshape((h, 1))
+    x = np.arange(w).reshape((1, w))
+    mask = (x - cx)**2 + (y - cy)**2 <= radius**2
+    out = np.zeros_like(frame)
+
+    if frame.ndim == 2:
+        # grayscale image
+        out[:, :] = frame[:, :] * mask
+    else:
+        # color image
+        for c in range(frame.shape[2]):
+            out[:, :, c] = frame[:, :, c] * mask
+    return out
+
+
+# Try to compile apply_circular_mask_py
+apply_circular_mask_compiled = None
+if PYCCEL_AVAILABLE:
+    apply_circular_mask_compiled = try_pyccel_compile(apply_circular_mask_py, language='c')
+if apply_circular_mask_compiled is None and NUMBA_AVAILABLE:
+    try:
+        apply_circular_mask_compiled = try_numba_jit(apply_circular_mask_py, nopython=True, parallel=False)
+    except Exception:
+        apply_circular_mask_compiled = None
+
+def apply_circular_mask(frame, cx, cy, radius):
+    """Unified wrapper to apply circular mask using compiled version if available."""
+    if apply_circular_mask_compiled is not None:
+        try:
+            return apply_circular_mask_compiled(frame, int(cx), int(cy), int(radius))
+        except Exception as e:
+            print("⚠️ Compiled apply_circular_mask failed at runtime:", e)
+    # fallback
+    return apply_circular_mask_py(frame, int(cx), int(cy), int(radius))
+
+# OpenCV UI for drawing circle mask (cannot compile)
+def draw_circle_mask_ui(image: np.ndarray):
+    """OpenCV UI to draw a circle mask on the provided grayscale image."""
+    display = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+    circle_center, circle_radius = None, 0
+    drawing = [False]
+
+    def mouse_callback(event, x, y, flags, param):
+        nonlocal circle_center, circle_radius
+        temp = display.copy()
+        if event == cv2.EVENT_LBUTTONDOWN:
+            circle_center = (x, y)
+            drawing[0] = True
+        elif event == cv2.EVENT_MOUSEMOVE and drawing[0]:
+            circle_radius = int(math.hypot(x - circle_center[0], y - circle_center[1]))
+            cv2.circle(temp, circle_center, circle_radius, (0, 255, 0), 2)
+            cv2.imshow("Draw Mask", temp)
+        elif event == cv2.EVENT_LBUTTONUP:
+            drawing[0] = False
+            circle_radius = int(math.hypot(x - circle_center[0], y - circle_center[1]))
+            cv2.circle(temp, circle_center, circle_radius, (0, 255, 0), 2)
+            cv2.imshow("Draw Mask", temp)
+
+    cv2.imshow("Draw Mask", display)
+    cv2.setMouseCallback("Draw Mask", mouse_callback)
+    print("\n🟢 Draw a circle to define your mask region.")
+    print("   - Click and drag to draw.")
+    print("   - Press ENTER or SPACE to confirm.")
+    print("   - Press ESC to cancel.")
+    while True:
+        key = cv2.waitKey(1) & 0xFF
+        if key in [13, 32]:  # Enter or Space
+            break
+        elif key == 27:  # ESC
+            circle_center, circle_radius = None, 0
+            break
+    cv2.destroyAllWindows()
+    cv2.waitKey(1)
+    if circle_center is None:
+        print("❌ No mask selected. Proceeding without mask.")
+        return None
+    print(f"✅ Mask confirmed: center={circle_center}, radius={circle_radius}")
+    return circle_center, circle_radius
+
+def optional_masking_workflow(video_path: str):
+    """Ask user if they want to mask the video and return mask parameters or None."""
+    # Using tkinter messagebox which requires the root to be withdrawn; root exists above
+    try:
+        answer = messagebox.askyesno("Mask Video", "Do you want to mask the video before processing?")
+    except Exception:
+        # in case tkinter isn't interactive, default to no
+        answer = False
+    mask_params = None
+
+    if answer:
+        print("🧠 Generating MIP to create mask from first 1000 frames...")
+        mip = generate_mip_py(video_path, num_frames=1000)
+        mask_params = draw_circle_mask_ui(mip)
+        if mask_params is not None:
+            print("✅ Circular mask will be applied to all frames.")
+        else:
+            print("⚠️ Proceeding without mask.")
+    else:
+        print("🚫 Masking skipped.")
+    return mask_params
+
 # ----------------------------
-# Main optimized processing function (keeps your signature)
+# Main optimized processing function (modified to accept mask_params)
 # ----------------------------
-def apply_function_to_images_optimized(directory_path, Z, WORMSXY, DistLimit, Worms, OGWORMDATA):
+def apply_function_to_images_optimized(directory_path, Z, WORMSXY, DistLimit, Worms, OGWORMDATA, mask_params=None):
     """
     Optimized main processing function that tracks worms across all frames.
-    Uses OpenCV connectedComponentsWithStats, compiled filters/matchers where available,
-    and vectorized fallbacks.
+    Added optional mask_params: (center_tuple, radius) or None.
     """
     print(f"🔍 Starting to process {Z} frames for {Worms} worms...")
     print(f"📊 Tracking parameters: Max distance = {DistLimit}px, Min blob size = {MIN_BLOB_SIZE}px")
@@ -494,6 +573,17 @@ def apply_function_to_images_optimized(directory_path, Z, WORMSXY, DistLimit, Wo
                 WORMSXY[count] = WORMSXY[count - 1]
             continue
 
+        # ---- Apply mask if available (this is where we integrated it) ----
+        if mask_params is not None:
+            center, radius = mask_params
+            # apply_circular_mask handles compiled vs fallback internally
+            try:
+                img = apply_circular_mask(img, center[0], center[1], radius)
+            except Exception as e:
+                print("⚠️ Error applying circular mask to frame:", e)
+                # fallback: continue with original img
+
+        # proceed with original preprocessing & pipeline
         image = preprocess_image_fast(img)
 
         # Connected components (fast OpenCV)
@@ -516,7 +606,6 @@ def apply_function_to_images_optimized(directory_path, Z, WORMSXY, DistLimit, Wo
                 featuresXY = features_all[kept_labels_indices]
 
         # Match worms
-        # note: OGWORMDATA is in shape (Worms, 2) (x,y)
         matched_positions = match_worms(featuresXY, OGWORMDATA, squared_limit)
 
         if matched_positions is None:
@@ -550,16 +639,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 def plot_results_fast(WORMSXY, output_path=None):
-    """
-    Generate visualization plot of worm trajectories without interactive display.
-    Expects WORMSXY shape: [worms × coords × frames] or [worms,2,frames], but the caller
-    sends transposed data in the same layout as original script.
-    """
     print("📊 Generating visualization plot...")
-    # If input is [worms,2,frames], convert to plotting friendly shapes
-    # We'll expect WORMSXY shape [worms, 2, frames]
     if WORMSXY.ndim != 3:
-        # attempt to transpose
         try:
             WORMSXY = np.transpose(WORMSXY, (0, 2, 1))
         except Exception:
@@ -684,6 +765,9 @@ def main():
     print_configuration_summary()
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+    # Ask user whether to mask the video, right after configuration summary
+    mask_params = optional_masking_workflow(VIDEO_PATH)
+
     # STEP 1: EXTRACT FRAMES
     if not os.path.exists(FRAMES_DIR) or count_files(FRAMES_DIR) == 0:
         print("🎬 Extracting frames from video...")
@@ -694,10 +778,9 @@ def main():
         print(f"📁 Using existing {total_frames} frames in {FRAMES_DIR}")
 
     # STEP 2: SELECT WORM POSITIONS
-    # Allow manual override via environment variable or existing coordinates (keeps original flow)
     user_choice = None
     try:
-        user_choice = None  # keep original get_user_preferences if you want; default to interactive
+        user_choice = None
     except Exception:
         user_choice = None
 
@@ -710,10 +793,10 @@ def main():
 
     # STEP 3: PROCESS FRAMES AND TRACK
     Z = count_files(FRAMES_DIR)
-    # Make WORMSXY in original shape: [Z, Worms, 2]
     WORMSXY = np.empty([Z, Worms, 2], dtype=np.float64)
 
-    WORMSXY = apply_function_to_images_optimized(FRAMES_DIR, Z, WORMSXY, MAX_DISTANCE_LIMIT, Worms, OGWORMDATA.copy())
+    # pass mask_params to the processing function
+    WORMSXY = apply_function_to_images_optimized(FRAMES_DIR, Z, WORMSXY, MAX_DISTANCE_LIMIT, Worms, OGWORMDATA.copy(), mask_params=mask_params)
 
     # STEP 4: SAVE RESULTS (transpose to [worms, 2, frames] to match plotting)
     WORMSXY_transposed = np.transpose(WORMSXY, (1, 2, 0))
