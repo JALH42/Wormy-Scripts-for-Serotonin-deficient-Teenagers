@@ -1,0 +1,147 @@
+import os
+import tkinter as tk
+from tkinter import filedialog
+
+def count_csv_files_in_folder(folder_path, count_subfolders=False):
+    """Count CSV files in a folder, optionally including subfolders"""
+    csv_count = 0
+    
+    if not os.path.exists(folder_path):
+        return 0
+        
+    if count_subfolders:
+        # Count all CSV files recursively
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                if file.lower().endswith('.csv'):
+                    csv_count += 1
+    else:
+        # Count only CSV files in the immediate directory
+        for item in os.listdir(folder_path):
+            item_path = os.path.join(folder_path, item)
+            if os.path.isfile(item_path) and item.lower().endswith('.csv'):
+                csv_count += 1
+    
+    return csv_count
+
+def process_folder(base_folder):
+    """Process the selected folder and count files according to requirements"""
+    processed_folder = os.path.join(base_folder, "processed")
+    
+    if not os.path.exists(processed_folder):
+        print(f"Error: 'processed' folder not found in {base_folder}")
+        return None
+    
+    results = {}
+    
+    # Process PD folders
+    pd_folders = [f for f in os.listdir(processed_folder) 
+                 if f.startswith('processed_N2_PD') and os.path.isdir(os.path.join(processed_folder, f))]
+    
+    correct_tracks_pd = 0
+    total_tracks_pd = 0
+    
+    for pd_folder in pd_folders:
+        pd_folder_path = os.path.join(processed_folder, pd_folder)
+        results_folder_path = os.path.join(pd_folder_path, "results")
+        
+        # Count CSV files only in the results folder (ignore subfolders of results)
+        if os.path.exists(results_folder_path):
+            correct_tracks_pd += count_csv_files_in_folder(results_folder_path, count_subfolders=False)
+        
+        # Count all CSV files in the entire PD folder including subfolders
+        total_tracks_pd += count_csv_files_in_folder(pd_folder_path, count_subfolders=True)
+    
+    rejected_tracks_pd = total_tracks_pd - correct_tracks_pd
+    
+    results['PD'] = {
+        'Correct tracks N2 PD': correct_tracks_pd,
+        'Total tracks N2 PD': total_tracks_pd,
+        'Rejected tracks N2 PD': rejected_tracks_pd
+    }
+    
+    # Process WF folders
+    wf_folders = [f for f in os.listdir(processed_folder) 
+                 if f.startswith('processed_N2_WF') and os.path.isdir(os.path.join(processed_folder, f))]
+    
+    correct_tracks_wf = 0
+    total_tracks_wf = 0
+    
+    for wf_folder in wf_folders:
+        wf_folder_path = os.path.join(processed_folder, wf_folder)
+        results_folder_path = os.path.join(wf_folder_path, "results")
+        
+        # Count CSV files only in the results folder (ignore subfolders of results)
+        if os.path.exists(results_folder_path):
+            correct_tracks_wf += count_csv_files_in_folder(results_folder_path, count_subfolders=False)
+        
+        # Count all CSV files in the entire WF folder including subfolders
+        total_tracks_wf += count_csv_files_in_folder(wf_folder_path, count_subfolders=True)
+    
+    rejected_tracks_wf = total_tracks_wf - correct_tracks_wf
+    
+    results['WF'] = {
+        'Correct tracks N2 WF': correct_tracks_wf,
+        'Total tracks N2 WF': total_tracks_wf,
+        'Rejected tracks N2 WF': rejected_tracks_wf
+    }
+    
+    return results
+
+def main():
+    # Create a root window (it will be hidden)
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+    
+    # Ask user to select folder A
+    print("Please select the main folder (Folder A)...")
+    folder_a = filedialog.askdirectory(title="Select Folder A")
+    
+    if not folder_a:
+        print("No folder selected. Exiting.")
+        return
+    
+    print(f"Selected folder: {folder_a}")
+    
+    # Process the folder
+    results = process_folder(folder_a)
+    
+    if results:
+        print("\n" + "="*50)
+        print("FILE COUNT RESULTS")
+        print("="*50)
+        
+        # Display PD results
+        print("\n--- N2 PD Results ---")
+        for key, value in results['PD'].items():
+            print(f"{key}: {value}")
+        
+        # Display WF results
+        print("\n--- N2 WF Results ---")
+        for key, value in results['WF'].items():
+            print(f"{key}: {value}")
+        
+        # Save results to a text file
+        output_file = os.path.join(folder_a, "file_count_results.txt")
+        try:
+            with open(output_file, 'w') as f:
+                f.write("FILE COUNT RESULTS\n")
+                f.write("="*50 + "\n")
+                
+                f.write("\n--- N2 PD Results ---\n")
+                for key, value in results['PD'].items():
+                    f.write(f"{key}: {value}\n")
+                
+                f.write("\n--- N2 WF Results ---\n")
+                for key, value in results['WF'].items():
+                    f.write(f"{key}: {value}\n")
+            
+            print(f"\nResults saved to: {output_file}")
+            
+        except Exception as e:
+            print(f"Error saving results to file: {e}")
+    
+    print("\nProcessing completed!")
+
+if __name__ == "__main__":
+    main()
