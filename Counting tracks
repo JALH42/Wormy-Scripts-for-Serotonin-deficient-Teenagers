@@ -1,6 +1,7 @@
 import os
 import tkinter as tk
 from tkinter import filedialog
+#DEALS WITH UGLY FOLDER STRUCTURE (TEMP)
 
 def count_csv_files_in_folder(folder_path, count_subfolders=False):
     """Count CSV files in a folder, optionally including subfolders"""
